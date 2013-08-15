@@ -1,0 +1,657 @@
+<?php
+/**
+ * The functions file is used to initialize everything in the theme.  It controls how the theme is loaded and 
+ * sets up the supported features, default actions, and default filters.  If making customizations, users 
+ * should create a child theme and make changes to its functions.php file (not this one).  Friends don't let 
+ * friends modify parent theme files. ;)
+ *
+ * Child themes should do their setup on the 'after_setup_theme' hook with a priority of 11 if they want to
+ * override parent theme features.  Use a priority of 9 if wanting to run before the parent theme.
+ *
+ * @package Basetheme
+ * @subpackage Functions
+ * @version 2.0
+ * @author Brian DiChiara <briandichiara@gmail.com>
+ * @copyright Copyright (c) 2013, Brian DiChiara
+ * @link http://briandichiara.com
+ * @license http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ */
+
+/* Load the core theme framework. */
+
+require_once( trailingslashit( TEMPLATEPATH ) . 'library/hybrid.php' );
+
+$theme = new Hybrid();
+
+/* Do theme setup on the 'after_setup_theme' hook. */
+
+add_action( 'after_setup_theme', 'basetheme_theme_setup' );
+
+/**
+ * Theme setup function.  This function adds support for theme features and defines the default theme
+ * actions and filters.
+ *
+ * @since 0.1.0
+ */
+
+function basetheme_theme_setup() {
+
+	/* Get action/filter hook prefix. */
+	
+	$prefix = hybrid_get_prefix();
+
+	/* Add theme support for core framework features. */
+		
+	/* Register menus. */
+	add_theme_support( 
+		'hybrid-core-menus', 
+		array( 'primary', 'secondary', 'subsidiary' ) 
+	);
+
+	/* Register sidebars. */
+	add_theme_support( 
+		'hybrid-core-sidebars', 
+		array( 'primary', 'secondary', 'subsidiary' ) 
+	);
+
+	/* Load scripts. */
+	add_theme_support( 
+		'hybrid-core-scripts', 
+		array( 'comment-reply' ) 
+	);
+
+	/* Add theme support for WordPress features. */
+	
+	add_theme_support( 'post-thumbnails' );
+	set_post_thumbnail_size( 150, 150, true );
+	
+	/* Register support for custom backgrounds */
+	
+	add_theme_support( 'custom-background' );
+	
+	add_theme_support( 'automatic-feed-links' );
+	
+	/* Register support for some post formats */
+	
+	add_theme_support( 
+		'post-formats', 
+		array( 'aside', 'gallery', 'image', 'link', 'quote', 'video' ) 
+	);
+	
+	/* Add theme support for Hybrid Core features */
+			
+	add_theme_support( 'hybrid-core-widgets' );
+	add_theme_support( 'hybrid-core-shortcodes' );
+	add_theme_support( 
+		'hybrid-core-theme-settings', 
+		array( 'about', 'footer' ) 
+	);
+	
+	add_theme_support( 'hybrid-core-meta-box-footer' );
+	add_theme_support( 'hybrid-core-template-hierarchy' );
+
+	/* Add theme support for Hybrid Core extensions. */
+
+	/* Enable theme layouts (need to add stylesheet support). */
+	add_theme_support( 
+		'theme-layouts', 
+		array( '1c', '2c-l', '2c-r' ), 
+		array( 'default' => '2c-l', 'customizer' => true ) 
+	);
+	
+	add_theme_support( 'loop-pagination' );
+	add_theme_support( 'get-the-image' );
+	add_theme_support( 'entry-views' );
+	add_theme_support( 'cleaner-gallery' );
+
+	/* Make content changes for post formats */
+	
+	/* Wraps <blockquote> around quote posts. */
+	add_filter( 'the_content', 'basetheme_quote_content' );
+	
+	/* Includes attached image if user doesn't include content on image post format */
+	add_filter( 'the_content', 'basetheme_image_content' );
+	
+	/* Add infinity symbol for asides. Priority 9 to beat wpautop */
+	add_filter( 'the_content', 'basetheme_aside_infinity', 9 ); 
+	
+	/* Register additional sidebars. */
+	
+	add_action( 'widgets_init', 'basetheme_register_sidebars', 9 );
+
+	/* Filter the sidebar widgets. */
+	
+	add_filter( 'sidebars_widgets', 'basetheme_disable_sidebars' );
+	add_action( 'template_redirect', 'basetheme_one_column' );
+
+	/* Change default comment status for pages to false. */	
+	
+	add_action( 'load-page-new.php', 'basetheme_change_comment_status' );
+	
+	/* Embed width/height defaults. */
+	
+	add_filter( 'embed_defaults', 'basetheme_embed_defaults' );
+	
+	/* change defaults for sidebar parameters */
+	
+	add_filter( "{$prefix}_sidebar_defaults", 'basetheme_change_sidebar_defaults' );
+	
+	/* load theme scripts and styles */
+	
+	add_action( 'wp_enqueue_scripts', 'basetheme_scripts' );
+	
+	/* Insert theme templates */	
+	
+	/* insert the header template part */
+	
+	add_action( "{$prefix}_before_main", 'basetheme_insert_header_template', 5 );
+	
+	/* insert the primaryy menu */
+	
+	add_action( "{$prefix}_before_header", 'basetheme_insert_primary_menu', 10 );
+	
+	/* insert the secondary menu */
+	
+	add_action( "{$prefix}_after_header", 'basetheme_insert_secondary_menu', 10 );
+
+	/* insert the feature template part on the front page */
+ 
+	add_action( "{$prefix}_home_before_main", 'basetheme_insert_feature_template', 10 );
+	
+	/* insert the loop meta */
+	
+	add_action( "{$prefix}_open_hfeed", 'basetheme_insert_loop_meta', 10 );
+
+	/* insert the loop nav */
+	
+	add_action( "{$prefix}_close_content", 'basetheme_insert_loop_nav', 10 );
+		
+	/* insert the feature sidebar */
+	
+	add_action( "{$prefix}_feature", 'basetheme_insert_feature_sidebar', 10 );	
+	
+	/* insert the primary sidebar */
+	
+	add_action( "{$prefix}_after_content", 'basetheme_insert_primary_sidebar', 5 );
+	
+	/* insert the secondary sidebar */
+	
+	add_action( "{$prefix}_after_content", 'basetheme_insert_secondary_sidebar', 10 );
+	
+	/* insert the after-singular sidebar */
+	
+	add_action( "{$prefix}_after_singular", 'basetheme_insert_after_singular_sidebar', 10 );
+	
+	/* insert the subsidiary sidebar */
+	
+	add_action( "{$prefix}_after_main", 'basetheme_insert_subsidiary_sidebar', 5 );	
+	
+	/* insert the subsidiary menu */
+	
+	add_action( "{$prefix}_after_main", 'basetheme_insert_subsidiary_menu', 10 );
+		
+	/* insert the footer template part */
+	
+	add_action( "{$prefix}_after_main", 'basetheme_insert_footer_template', 15 );
+
+}
+
+
+/**
+ * Registers scripts for the theme and enqueue those used sitewide.
+ *
+ * @since 0.1.0.
+ */
+
+function basetheme_scripts() {
+
+	#wp_enqueue_style( 'basetheme-style', get_stylesheet_uri() );
+	wp_enqueue_style( 'basetheme-base', get_template_directory_uri() . '/css/base.css' );
+	wp_enqueue_style( 'basetheme-responsive', get_template_directory_uri() . '/css/responsive.css', array( 'basetheme-base' ) );
+	
+	wp_register_script( 'basetheme-custom', get_template_directory_uri() . '/js/basetheme-custom.js', array( 'jquery', 'fitvids' ), '20120206', true );
+	wp_register_script( 'small-menu', get_template_directory_uri() . '/js/small-menu.js', array( 'jquery' ), '20120206', true );
+	wp_register_script( 'small-menu-secondary', get_template_directory_uri() . '/js/small-menu-secondary.js', array( 'jquery' ), '20120206', true );
+	wp_register_script( 'fitvids', get_template_directory_uri() . '/js/fitvids.js', array( 'jquery' ), '20120206', true );
+	
+	wp_enqueue_script( 'basetheme-custom' );
+	wp_enqueue_script( 'small-menu' );
+	wp_enqueue_script( 'small-menu-secondary' );
+	wp_enqueue_script( 'fitvids' );
+
+}
+
+
+/**
+ * Registers new sidebars for the theme.
+ *
+ * @since 0.1.0.
+ */
+
+function basetheme_register_sidebars() {
+
+	register_sidebar( 
+	
+		array( 
+			'name'		=>	__( 'Feature', 'basetheme' ), 
+			'id'			=>	'feature', 
+			'description'	=>	__( 'Displayed in the feature area.', 'basetheme' ), 
+			'before_widget' 	=> 	'<aside id="%1$s" class="widget %2$s widget-%2$s">',
+			'after_widget' 	=> 	'</aside>',
+			'before_title'	=>	'<h3 class="widget-title">', 
+			'after_title'	=>	'</h3>' 
+		) 
+	
+	);
+
+}
+
+/**
+ * Filters Hybrid Core sidebar defaults for the theme.
+ *
+ * @since 0.1.0.
+ */
+
+function basetheme_change_sidebar_defaults() {
+	
+	$defaults = array(
+		'before_widget' 	=> 	'<aside id="%1$s" class="widget %2$s widget-%2$s">',
+		'after_widget' 	=> 	'</aside>',
+		'before_title' 	=> 	'<h3 class="widget-title">',
+		'after_title' 	=> 	'</h3>'
+	);
+	
+	return $defaults;
+	
+}
+
+
+/**
+ * Sets default comment and ping status
+ * to off for "Page" post types
+ * 
+ */
+
+function basetheme_change_comment_status() {
+	
+	add_filter( 'option_default_comment_status', '__return_false' );
+	add_filter( 'option_default_ping_status', '__return_false' );
+
+}
+
+
+
+/**
+ * Function for deciding which pages should have a one-column layout.
+ *
+ * @since 0.1.0
+ */
+function basetheme_one_column() {
+
+	if ( ! is_active_sidebar( 'primary' ) && ! is_active_sidebar( 'secondary' ) ) {
+		
+		add_filter( 'get_theme_layout', 'basetheme_post_layout_one_column' );
+
+	} elseif ( is_attachment() ) {
+		
+		add_filter( 'get_theme_layout', 'basetheme_post_layout_one_column' );
+		
+	}
+	
+}
+
+
+/**
+ * Filters 'get_post_layout' by returning 'layout-1c'.
+ *
+ * @since 0.1.0
+ */
+
+function basetheme_post_layout_one_column( $layout ) {
+	
+	return 'layout-1c';
+
+}
+
+/**
+ * Disables sidebars if viewing a one-column page.
+ *
+ * @since 0.1.0
+ */
+
+function basetheme_disable_sidebars( $sidebars_widgets ) {
+	
+	global $wp_query;
+
+	if ( current_theme_supports( 'theme-layouts' ) ) {
+
+		if ( 'layout-1c' == theme_layouts_get_layout() ) {
+			
+			$sidebars_widgets['primary'] = false;
+			$sidebars_widgets['secondary'] = false;
+		
+		}
+	
+	}
+
+	return $sidebars_widgets;
+}
+
+
+/**
+ * Overwrites the default widths for embeds.  This is especially useful for making sure videos properly
+ * expand the full width on video pages.  This function overwrites what the $content_width variable handles
+ * with context-based widths.
+ *
+ * @since 0.1.0
+ */
+
+function basetheme_embed_defaults( $args ) {
+
+	if ( current_theme_supports( 'theme-layouts' ) ) {
+
+		$layout = theme_layouts_get_layout();
+
+		if ( 'layout-3c-l' == $layout || 'layout-3c-r' == $layout || 'layout-3c-c' == $layout ) {
+			
+			$args['width'] = 500;
+		
+		} elseif ( 'layout-1c' == $layout ) {
+			
+			$args['width'] = 928;
+		
+		} else {
+			
+			$args['width'] = 650;
+			
+		}
+	
+	} else {
+		
+		$args['width'] = 650;
+		
+	}
+
+	return $args;
+
+}
+
+/**
+ * Hook in the header template part
+ * default location is before_main, priority 5
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_header_template() {
+
+	get_template_part( 'part' , 'header' );
+	 
+}
+
+/**
+ * Enable the home feature widget area
+ * default location is before_main
+ *
+ * @since 0.1.0.
+ */
+
+function basetheme_insert_feature_template() {
+
+	get_template_part( 'part', 'feature' );			
+		
+}
+
+/**
+ * insert loop meta
+ * default location is open_hfeed, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_loop_meta() {
+	
+	get_template_part( 'loop', 'meta' ); // Get the loop meta box	
+
+}
+
+/**
+ * insert loop nav
+ * default location is close_content, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_loop_nav() {
+	
+	get_template_part( 'loop', 'nav' ); // Get the loop meta box	
+
+}
+
+/**
+ * Hook in the feature sidebar
+ * default location is feature, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_feature_sidebar() {
+
+	get_sidebar( 'feature' ); // Loads the sidebar-primary.php template.
+	 
+}
+
+/**
+ * Hook in the primary menu
+ * default location is before_header
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_primary_menu() {
+
+	get_template_part( 'menu', 'primary' );
+	 
+}
+
+/**
+ * Hook in the secondary menu
+ * default location is after_header
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_secondary_menu() {
+
+	get_template_part( 'menu', 'secondary' );
+	 
+}
+
+/**
+ * Hook in the subsidiary menu
+ * default location is after_main, priority 5
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_subsidiary_menu() {
+
+	get_template_part( 'menu', 'subsidiary' ); // Load the menu-subsidiary.php template.
+	 
+}
+
+/**
+ * Hook in the primary sidebar
+ * default location is after_content, priority 5
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_primary_sidebar() {
+
+	get_sidebar( 'primary' ); // Loads the sidebar-primary.php template.
+	 
+}
+
+/**
+ * Hook in the secondary sidebar
+ * default location is after_content, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_secondary_sidebar() {
+
+	get_sidebar( 'secondary' ); // Loads the sidebar-secondary.php template.
+	 
+}
+
+/**
+ * Hook in the after-singular sidebar
+ * default location is after_singular, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_after_singular_sidebar() {
+
+	get_sidebar( 'after-singular' ); // Loads the sidebar-after-singular.php template.
+	 
+}
+
+/**
+ * Hook in the subsidiary sidebar
+ * default location is after_main, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_subsidiary_sidebar() {
+
+	get_sidebar( 'subsidiary' );
+	 
+}
+
+/**
+ * Hook in the footer template part
+ * default location is close_body, priority 10
+ *
+ * @since 0.1.0.
+ */
+function basetheme_insert_footer_template() {
+
+	get_template_part( 'part' , 'footer' );
+	 
+}
+
+
+/**
+ * Wraps the output of the quote post format content in a <blockquote> element if the user hasn't added a 
+ * <blockquote> in the post editor.
+ *
+ * @note This function is used from Justin Tadlock's Theme Hybrid community
+ * @since 0.1.0
+ * @param string $content The post content.
+ * @return string $content
+ */
+ 
+function basetheme_quote_content( $content ) {
+
+	if ( has_post_format( 'quote' ) ) {
+		
+		preg_match( '/<blockquote.*?>/', $content, $matches );
+
+		if ( empty( $matches ) ) {
+			
+			$content = "<blockquote>{$content}</blockquote>";
+		
+		}
+		
+	}
+
+	return $content;
+}
+
+/**
+ * Grabs the first URL from the post content of the current post.  This is meant to be used with the link post 
+ * format to easily find the link for the post. 
+ *
+ * @since 0.1.0
+ * @return string The link if found.  Otherwise, the permalink to the post.
+ *
+ * @note This is copied from Justin Tadlock's Theme Hybrid. He modified it from twenty eleven - see below.
+ * @note This is a modified version of the twentyeleven_url_grabber() function in the TwentyEleven theme.
+ * @author wordpressdotorg
+ * @copyright Copyright (c) 2011 - 2012, wordpressdotorg
+ * @link http://wordpress.org/extend/themes/twentyeleven
+ * @license http://wordpress.org/about/license
+ */
+function basetheme_url_grabber() {
+	
+	if ( ! preg_match( '/<a\s[^>]*?href=[\'"](.+?)[\'"]/is', get_the_content(), $matches ) ) {
+		
+		return get_permalink( get_the_ID() );
+		
+	}
+
+	return esc_url_raw( $matches[1] );
+
+}
+
+/**
+ * Returns the number of images attached to the current post in the loop.
+ *
+ * @since 0.1.0
+ * @return int
+ * @note This is copied from Justin Tadlock's Theme Hybrid theme, Picturesque.
+ * @author Justin Tadlock
+ * @copyright Copyright (c), Justin Tadlock
+ * @link http://themehybrid.com
+ */
+function basetheme_get_image_attachment_count() {
+	
+	$images = get_children( array( 'post_parent' => get_the_ID(), 'post_type' => 'attachment', 'post_mime_type' => 'image', 'numberposts' => -1 ) );
+	
+	return count( $images );
+
+}
+
+/**
+ * Returns the featured image for the image post format if the user didn't add any content to the post.
+ *
+ * @note This function is used from Justin Tadlock's Theme Hybrid community
+ * @since 0.1.0
+ * @param string $content The post content.
+ * @return string $content
+ */
+function basetheme_image_content( $content ) {
+
+	if ( has_post_format( 'image' ) && '' == $content ) {
+		
+		if ( is_singular() ) {
+			
+			$content = get_the_image( array( 'size' => 'full', 'meta_key' => false, 'link_to_post' => false ) );
+		
+		} else {
+			
+			$content = get_the_image( array( 'size' => 'full', 'meta_key' => false ) );
+			
+		}
+	
+	}
+
+	return $content;
+}
+
+
+/**
+ * Adds infinity symbol to asides
+ *
+ * This function filters the content and, if it's the "aside" post format, adds the infinity symbol
+ * It runs at priority nine so that it goes before wpautop()
+ *
+ * @note credit Justin Tadlock - http://justintadlock.com/archives/2012/09/06/post-formats-aside 
+ * @since 0.1.0
+ * @param string $content The post content.
+ * @return string $content
+ */
+ 
+function basetheme_aside_infinity( $content ) {
+
+	if ( has_post_format( 'aside' ) && !is_singular() ) {
+		
+		$content .= ' <a href="' . esc_url( get_permalink() ) . '"> &#8734; </a>';
+		
+	}
+
+	return $content;
+}
